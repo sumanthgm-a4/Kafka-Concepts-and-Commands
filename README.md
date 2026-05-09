@@ -1274,6 +1274,393 @@ flowchart LR
 
 ---
 
+# Kafka Multi-Broker + Multi-Partition Replication & Fetching
+
+## Topic Setup
+
+Example:
+
+```text
+Topic: orders
+
+Partitions = 3
+Replication Factor = 2
+Brokers = 3
+```
+
+Kafka distributes partition replicas across brokers.
+
+Example layout:
+
+| Partition | Leader   | Follower |
+| --------- | -------- | -------- |
+| P0        | Broker 1 | Broker 2 |
+| P1        | Broker 2 | Broker 3 |
+| P2        | Broker 3 | Broker 1 |
+
+---
+
+## Cluster Layout
+
+```mermaid
+flowchart LR
+
+    subgraph B1["Broker 1"]
+
+        P0L["P0 Leader"]
+        P2F["P2 Follower"]
+
+    end
+
+    subgraph B2["Broker 2"]
+
+        P1L["P1 Leader"]
+        P0F["P0 Follower"]
+
+    end
+
+    subgraph B3["Broker 3"]
+
+        P2L["P2 Leader"]
+        P1F["P1 Follower"]
+
+    end
+```
+
+---
+
+## Important Concepts
+
+Each partition has:
+
+* ONE leader
+* ZERO or more followers
+
+Kafka replication happens:
+
+* per partition
+* independently
+* continuously
+
+Followers DO NOT receive pushed data.
+
+Instead:
+
+> Followers continuously FETCH data from leaders.
+
+Kafka replication is pull-based.
+
+---
+
+## Producer Write Flow
+
+Producers write ONLY to partition leaders.
+
+```mermaid
+flowchart LR
+
+    PRODUCER["Producer"]
+
+    P0["P0 Leader<br/>Broker 1"]
+    P1["P1 Leader<br/>Broker 2"]
+    P2["P2 Leader<br/>Broker 3"]
+
+    PRODUCER -->|"Order-101"| P0
+    PRODUCER -->|"Order-102"| P1
+    PRODUCER -->|"Order-103"| P2
+```
+
+---
+
+## Replication Flow
+
+Followers continuously fetch new records from their respective leaders.
+
+```mermaid
+flowchart TB
+
+    subgraph Broker1
+
+        P0L["P0 Leader"]
+        P2F["P2 Follower"]
+
+    end
+
+    subgraph Broker2
+
+        P1L["P1 Leader"]
+        P0F["P0 Follower"]
+
+    end
+
+    subgraph Broker3
+
+        P2L["P2 Leader"]
+        P1F["P1 Follower"]
+
+    end
+
+    P0F -->|"Fetch P0 Data"| P0L
+    P1F -->|"Fetch P1 Data"| P1L
+    P2F -->|"Fetch P2 Data"| P2L
+```
+
+---
+
+## Internal Mental Model
+
+Followers are basically saying:
+
+```text
+"Yo leader, gimme everything after offset X"
+```
+
+Leader responds with:
+
+* new records
+* latest offsets
+
+Followers append them locally.
+
+---
+
+## Write + Replication Sequence
+
+Example for Partition P0:
+
+```mermaid
+sequenceDiagram
+
+    participant PROD as Producer
+    participant B1 as Broker 1 (P0 Leader)
+    participant B2 as Broker 2 (P0 Follower)
+
+    PROD->>B1: Produce Order Created
+    B1->>B1: Append to P0 log
+
+    loop Continuous Replication Fetch
+        B2->>B1: Fetch from offset 220
+        B1-->>B2: New records
+        B2->>B2: Append to replica log
+    end
+```
+
+---
+
+## Replica Logs
+
+After replication:
+
+```text
+Broker 1
+P0 Leader     [0 1 2 3]
+
+Broker 2
+P0 Follower   [0 1 2 3]
+```
+
+Leader and follower replicas contain the same partition data.
+
+---
+
+## Consumer Fetching
+
+Consumers ALSO fetch.
+
+Consumers read ONLY from partition leaders.
+
+```mermaid
+flowchart LR
+
+    CONSUMERS["Consumer Group"]
+
+    P0["P0 Leader<br/>Broker 1"]
+    P1["P1 Leader<br/>Broker 2"]
+    P2["P2 Leader<br/>Broker 3"]
+
+    CONSUMERS -->|"Fetch P0"| P0
+    CONSUMERS -->|"Fetch P1"| P1
+    CONSUMERS -->|"Fetch P2"| P2
+```
+
+---
+
+## Consumer Fetch Sequence
+
+```mermaid
+sequenceDiagram
+
+    participant C as Consumer
+    participant L as Broker 1 (P0 Leader)
+
+    C->>L: Fetch from offset 200
+    L-->>C: Messages 201-220
+```
+
+---
+
+## Parallelism
+
+Multiple partitions allow parallel consumption.
+
+```mermaid
+flowchart LR
+
+    C1["Consumer 1"]
+    C2["Consumer 2"]
+    C3["Consumer 3"]
+
+    P0["Partition 0"]
+    P1["Partition 1"]
+    P2["Partition 2"]
+
+    C1 --> P0
+    C2 --> P1
+    C3 --> P2
+```
+
+This is why Kafka scales:
+
+* more partitions
+* more parallel consumers
+* more throughput
+
+---
+
+## Full Cluster Data Flow
+
+```mermaid
+flowchart TB
+
+    PRODUCER["Producer"]
+
+    subgraph B1["Broker 1"]
+
+        P0L["P0 Leader"]
+        P2F["P2 Follower"]
+
+    end
+
+    subgraph B2["Broker 2"]
+
+        P1L["P1 Leader"]
+        P0F["P0 Follower"]
+
+    end
+
+    subgraph B3["Broker 3"]
+
+        P2L["P2 Leader"]
+        P1F["P1 Follower"]
+
+    end
+
+    CONSUMERS["Consumer Group"]
+
+    PRODUCER --> P0L
+    PRODUCER --> P1L
+    PRODUCER --> P2L
+
+    P0F -->|"Fetch P0"| P0L
+    P1F -->|"Fetch P1"| P1L
+    P2F -->|"Fetch P2"| P2L
+
+    CONSUMERS --> P0L
+    CONSUMERS --> P1L
+    CONSUMERS --> P2L
+```
+
+---
+
+## Broker Failure & Leader Election
+
+Suppose Broker 1 crashes.
+
+Before:
+
+```text
+P0 Leader -> Broker 1
+P0 Follower -> Broker 2
+```
+
+After election:
+
+```text
+P0 Leader -> Broker 2
+```
+
+Now:
+
+* producers write to Broker 2
+* consumers read from Broker 2
+* replication continues normally
+
+---
+
+## Failover Visualization
+
+```mermaid
+flowchart LR
+    subgraph AFTER
+
+        NB2["Broker 2<br/>NEW P0 Leader"]
+    end
+
+    subgraph BEFORE
+
+        B1["Broker 1<br/>P0 Leader -> CRASH"]
+        B2["Broker 2<br/>P0 Follower"]
+    end
+```
+
+---
+
+## In-Sync Replicas (ISR)
+
+Kafka tracks replicas that are fully caught up.
+
+Example:
+
+```text
+ISR = [Broker1, Broker2]
+```
+
+Only ISR replicas are eligible to become leaders.
+
+---
+
+## Most Important Kafka Truth
+
+Kafka replication is NOT:
+
+```text
+Leader PUSHES data to followers
+```
+
+Kafka replication IS:
+
+```text
+Followers FETCH data from leaders
+```
+---
+
+## Most Important Mental Model
+```
+Topic
+ └── Partitions
+      └── Replicas
+           ├── Leader
+           └── Followers
+```
+
+Kafka replication and fetching happen:
+- per partition
+- per replica
+- independently
+- continuously
+
+---
+
 # Summary
 
 Kafka is:
