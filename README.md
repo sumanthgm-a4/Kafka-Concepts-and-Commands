@@ -1228,6 +1228,8 @@ KafkIO is a good GUI client for:
 
 ![alt text](image.png)
 
+[Download it here](https://kafkio.com/download)
+
 Useful alternative GUIs:
 
 * AKHQ
