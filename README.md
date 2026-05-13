@@ -1276,6 +1276,8 @@ flowchart LR
 
 # Kafka Multi-Broker + Multi-Partition Replication & Fetching
 
+Refer to and use the included [docker compose yaml](multi-broker-kafka.yaml) file to run a Kafka Cluster with 3 brokers locally. 
+
 ## Topic Setup
 
 Example:
