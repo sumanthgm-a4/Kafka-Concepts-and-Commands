@@ -847,6 +847,18 @@ ReplicationFactor: 1
   --topic orders
 ```
 
+By default the key of messages is ```null```.
+
+To produce messages using a key:
+```bash
+/opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic orders \
+  --property parse.key=true
+  --property key.separator=:
+```
+(uses the mentioned key separator to parse the key)
+
 Now type messages:
 
 ```text
