@@ -337,7 +337,8 @@ Messages are continuously appended.
 
 # 6. Partition
 
-Topics are split into partitions.
+Fundamental Unit of parallelism.    
+Topics are split into partitions.   
 This is where the messages actually live in like a Queue.
 
 Partitions enable:
@@ -556,6 +557,17 @@ This distributes:
 * reads
 * writes
 * CPU load
+
+---
+
+# process.roles
+
+Every node here is either:
+1. Broker (Read + Write), 
+2. Controller (Manages the cluster) or
+3. Broker + Controller (Brokers eligible to be a Controller)
+
+- Only one active controller exists at any given time.
 
 ---
 
