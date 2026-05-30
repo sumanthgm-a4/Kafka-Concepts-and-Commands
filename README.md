@@ -164,7 +164,7 @@ flowchart LR
 
 # Kafka Terminology
 
-# 1. Message / Record / Event
+## 1. Message / Record / Event
 
 A Kafka message is a piece of data.
 
@@ -231,7 +231,7 @@ at 2026-05-09T10:00
 
 ---
 
-# 2. Producer
+## 2. Producer
 
 A Producer sends messages to Kafka.
 
@@ -264,7 +264,7 @@ Producer responsibilities:
 
 ---
 
-# 3. Consumer
+## 3. Consumer
 
 A Consumer reads messages from Kafka.
 
@@ -286,7 +286,7 @@ Kafka does not push data.
 
 ---
 
-# 4. Broker
+## 4. Broker
 
 A Kafka server is called a Broker.
 
@@ -309,7 +309,7 @@ Production systems use multiple brokers.
 
 ---
 
-# 5. Topic
+## 5. Topic
 
 A Topic is like a category or stream.
 It's a logical grouping of partitions.
@@ -335,7 +335,7 @@ Messages are continuously appended.
 
 ---
 
-# 6. Partition
+## 6. Partition
 
 Fundamental Unit of parallelism.    
 Topics are split into partitions.   
@@ -371,7 +371,7 @@ flowchart LR
 
 ---
 
-# 7. Offset
+## 7. Offset
 
 Every message inside a partition gets an offset.
 
@@ -391,7 +391,7 @@ Consumers track offsets to know what they already consumed.
 
 ---
 
-# 8. Consumer Groups
+## 8. Consumer Groups
 
 Consumer groups allow scaling consumers.
 
@@ -432,7 +432,7 @@ sequenceDiagram
 
 ---
 
-# 9. Pub/Sub
+## 9. Pub/Sub
 
 Publish/Subscribe means:
 
@@ -457,7 +457,7 @@ flowchart LR
 
 ---
 
-# 10. Replication
+## 10. Replication
 
 Kafka replicates partitions across brokers.
 
@@ -491,7 +491,7 @@ sequenceDiagram
 
 ---
 
-# 11. Replication Factor
+## 11. Replication Factor
 
 Replication factor defines:
 
@@ -512,7 +512,7 @@ Total copies = 3
 
 ---
 
-# 12. Leader and Followers
+## 12. Leader and Followers
 
 Each partition has:
 
@@ -527,6 +527,35 @@ flowchart TD
 
     Leader --> F1[Follower Replica 1]
     Leader --> F2[Follower Replica 2]
+```
+---
+
+## 13. Message Acknowledgement (Offset commit)
+
+Kafka maintains some kind of ledger to tracks messages - which messages are delivered to which consumer etc.
+
+Kafka updates the offset (as part of offset tracking) only when it receives an acknowledgement from the consumer.
+
+**Acknowledgment** is an application concept and **Offset commit** is the Kafka operation behind it.
+
+```mermaid
+sequenceDiagram
+    participant P as Producer
+    participant K as Kafka Broker
+    participant C as Consumer
+
+    P->>K: Send Message (offset=105)
+    K-->>P: Ack
+
+    C->>K: Poll Messages
+    K-->>C: Message(offset=105)
+
+    Note over C: Process the message
+
+    C->>K: Acknowledge / Commit Offset 106
+    Note right of K: Offset 106 stored<br/>for this consumer group
+
+    Note over K: Kafka now knows that<br/>messages up to offset 105<br/>have been successfully processed
 ```
 
 ---
@@ -560,7 +589,7 @@ This distributes:
 
 ---
 
-# process.roles
+## process.roles
 
 Every node here is either:
 1. Broker (Read + Write), 
