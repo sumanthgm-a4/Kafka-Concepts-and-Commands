@@ -784,6 +784,11 @@ docker run -d \
   apache/kafka:latest
 ```
 
+or use Docker Compose + included [docker compose](kafka-container.yaml) file:
+```bash
+docker compose -f kafka-container.yaml up
+```
+
 Verify:
 
 ```bash
